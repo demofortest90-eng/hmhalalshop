@@ -10,9 +10,11 @@ import base64
 import json
 import requests
 import os 
+from flask_cors import CORS
 
 load_dotenv()
 app = Flask(__name__)
+CORS(app)
 app.secret_key = "secret123"
 
 # MongoDB Connection
@@ -36,6 +38,28 @@ def upload_to_imgbb(file):
     if response.status_code == 200:
         return response.json()['data']['url']
     return None
+
+# --- STEP 1: API ROUTE FOR DECOUPLED FRONTEND ---
+@app.route('/api/products')
+def get_products_api():
+    try:
+        # ডাটাবেস থেকে সব প্রোডাক্ট খুঁজে বের করা (নতুনগুলো আগে)
+        products = list(products_db.find().sort("_id", -1))
+        
+        # MongoDB-এর ObjectId কে স্ট্রিং-এ রূপান্তর করা (নাহলে JSON এরর দেবে)
+        for p in products:
+            p['_id'] = str(p['_id'])
+            # যদি ডেট থাকে তবে সেটিকেও স্ট্রিং করে নেওয়া ভালো
+            if 'created_at' in p:
+                p['created_at'] = p['created_at'].isoformat()
+        
+        return jsonify({
+            "success": True,
+            "count": len(products),
+            "products": products
+        })
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
 
 @app.route('/')
 def index():
